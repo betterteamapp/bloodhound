@@ -421,6 +421,18 @@ module Database.Bloodhound.Types
        , TokenChar(..)
        , Shingle(..)
        , Language(..)
+       -- custom stuff we added
+       , Standard(..)
+       , Letter(..)
+       , Lowercase(..)
+       , Whitespace(..)
+       , UaxUrlEmail(..)
+       , Classic(..)
+       , ThaiTokenizer(..)
+       , EdgeNgram(..)
+       , Keyword(..)
+       , PatternTokenizer(..)
+       , Path(..)
        ) where
 
 import           Bloodhound.Import
