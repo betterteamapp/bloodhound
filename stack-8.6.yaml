@@ -12,3 +12,7 @@ extra-deps:
   - quickcheck-properties-0.1
 
 resolver: lts-13.30
+
+nix:
+  pure: false
+  packages: [zlib ]
