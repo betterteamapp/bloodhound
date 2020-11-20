@@ -1,4 +1,4 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc865", withHoogle ? false }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc884", withHoogle ? false }:
 let
   inherit (nixpkgs) pkgs;
   pinnedUnstable =
