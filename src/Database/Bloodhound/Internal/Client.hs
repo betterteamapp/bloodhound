@@ -10,11 +10,6 @@ module Database.Bloodhound.Internal.Client where
 
 import           Bloodhound.Import
 
-#if defined(MIN_VERSION_GLASGOW_HASKELL)
-#if MIN_VERSION_GLASGOW_HASKELL(8,6,0,0)
-import           Control.Monad.Fail                         (MonadFail)
-#endif
-#endif
 import qualified Data.HashMap.Strict                        as HM
 import           Data.Map.Strict                            (Map)
 import qualified Data.SemVer                                as SemVer
@@ -256,12 +251,12 @@ attrFilterJSON fs = object [ n .= T.intercalate "," (toList vs)
 parseAttrFilter :: Value -> Parser (NonEmpty NodeAttrFilter)
 parseAttrFilter = withObject "NonEmpty NodeAttrFilter" parse
   where parse o = case HM.toList o of
-                    []   -> fail "Expected non-empty list of NodeAttrFilters"
+                    []   -> error "Expected non-empty list of NodeAttrFilters"
                     x:xs -> DT.mapM (uncurry parse') (x :| xs)
         parse' n = withText "Text" $ \t ->
           case T.splitOn "," t of
             fv:fvs -> return (NodeAttrFilter (NodeAttrName n) (fv :| fvs))
-            []     -> fail "Expected non-empty list of filter values"
+            []     -> error "Expected non-empty list of filter values"
 
 instance ToJSON UpdatableIndexSetting where
   toJSON (NumberOfReplicas x) = oPath ("index" :| ["number_of_replicas"]) x
@@ -450,7 +445,7 @@ instance FromJSON FSType where
   parseJSON = withText "FSType" parse
     where parse "simple"   = pure FSSimple
           parse "buffered" = pure FSBuffered
-          parse t          = fail ("Invalid FSType: " <> show t)
+          parse t          = error ("Invalid FSType: " <> show t)
 
 data InitialShardCount = QuorumShards
                        | QuorumMinus1Shards
@@ -505,7 +500,7 @@ instance FromJSON NominalDiffTimeJSON where
   parseJSON = withText "NominalDiffTime" parse
     where parse t = case T.takeEnd 1 t of
                       "s" -> NominalDiffTimeJSON . fromInteger <$> parseReadText (T.dropEnd 1 t)
-                      _ -> fail "Invalid or missing NominalDiffTime unit (expected s)"
+                      _ -> error "Invalid or missing NominalDiffTime unit (expected s)"
 
 data IndexSettingsSummary = IndexSettingsSummary
   { sSummaryIndexName     :: IndexName
@@ -530,7 +525,7 @@ instance FromJSON IndexSettingsSummary where
                       [(ixn, v@(Object o'))] -> IndexSettingsSummary (IndexName ixn)
                                                 <$> parseJSON v
                                                 <*> (fmap (filter (not . redundant)) . parseSettings =<< o' .: "settings")
-                      _ -> fail "Expected single-key object with index name"
+                      _ -> error "Expected single-key object with index name"
           redundant (NumberOfReplicas _) = True
           redundant _                    = False
 
@@ -633,7 +628,7 @@ instance FromJSON AllocationPolicy where
           parse "primaries" = pure AllocPrimaries
           parse "new_primaries" = pure AllocNewPrimaries
           parse "none" = pure AllocNone
-          parse t = fail ("Invlaid AllocationPolicy: " <> show t)
+          parse t = error ("Invlaid AllocationPolicy: " <> show t)
 
 {-| 'BulkOperation' is a sum type for expressing the four kinds of bulk
     operation index, create, delete, and update. 'BulkIndex' behaves like an
@@ -813,7 +808,7 @@ instance FromJSON AliasRouting where
             sr <- o .:? "search_routing"
             ir <- o .:? "index_routing"
             if isNothing sr && isNothing ir
-               then fail "Both search_routing and index_routing can't be blank"
+               then error "Both search_routing and index_routing can't be blank"
                else return (GranularAliasRouting sr ir)
 
 instance FromJSON IndexAliasCreate where
@@ -862,7 +857,7 @@ instance Enum DocVersion where
 instance FromJSON DocVersion where
   parseJSON v = do
     i <- parseJSON v
-    maybe (fail "DocVersion out of range") return $ mkDocVersion i
+    maybe (error "DocVersion out of range") return $ mkDocVersion i
 
 {-| 'ExternalDocVersion' is a convenience wrapper if your code uses its
 own version numbers instead of ones from ES.
@@ -1525,7 +1520,7 @@ instance FromJSON SnapshotState where
       parse "ABORTED" = return SnapshotAborted
       parse "MISSING" = return SnapshotMissing
       parse "WAITING" = return SnapshotWaiting
-      parse t         = fail ("Invalid snapshot state " <> T.unpack t)
+      parse t         = error ("Invalid snapshot state " <> T.unpack t)
 
 
 data SnapshotRestoreSettings = SnapshotRestoreSettings {
@@ -2029,7 +2024,7 @@ instance FromJSON LoadAvgs where
         [one, five, fifteen] -> LoadAvgs <$> parseJSON one
                                          <*> parseJSON five
                                          <*> parseJSON fifteen
-        _                    -> fail "Expecting a triple of Doubles"
+        _                    -> error "Expecting a triple of Doubles"
 
 instance FromJSON NodeIndicesStats where
   parseJSON = withObject "NodeIndicesStats" parse
@@ -2272,7 +2267,7 @@ instance Read TimeInterval where
       f 'h' = return Hours
       f 'm' = return Minutes
       f 's' = return Seconds
-      f  _  = fail "TimeInterval expected one of w, d, h, m, s"
+      f  _  = error "TimeInterval expected one of w, d, h, m, s"
 
 data Interval = Year
               | Quarter
@@ -2295,11 +2290,11 @@ instance ToJSON Interval where
 
 parseStringInterval :: (Monad m) => String -> m NominalDiffTime
 parseStringInterval s = case span isNumber s of
-  ("", _) -> fail "Invalid interval"
+  ("", _) -> error "Invalid interval"
   (nS, unitS) -> case (readMay nS, readMay unitS) of
     (Just n, Just unit) -> return (fromInteger (n * unitNDT unit))
-    (Nothing, _)        -> fail "Invalid interval number"
-    (_, Nothing)        -> fail "Invalid interval unit"
+    (Nothing, _)        -> error "Invalid interval number"
+    (_, Nothing)        -> error "Invalid interval unit"
   where
     unitNDT Seconds = 1
     unitNDT Minutes = 60
@@ -2314,12 +2309,12 @@ instance FromJSON ThreadPoolSize where
       parseAsInt (-1) = return ThreadPoolUnbounded
       parseAsInt n
         | n >= 0 = return (ThreadPoolBounded n)
-        | otherwise = fail "Thread pool size must be >= -1."
+        | otherwise = error "Thread pool size must be >= -1."
       parseAsString = withText "ThreadPoolSize" $ \t ->
         case first (readMay . T.unpack) (T.span isNumber t) of
           (Just n, "k") -> return (ThreadPoolBounded (n * 1000))
           (Just n, "")  -> return (ThreadPoolBounded n)
-          _             -> fail ("Invalid thread pool size " <> T.unpack t)
+          _             -> error ("Invalid thread pool size " <> T.unpack t)
 
 instance FromJSON ThreadPoolType where
   parseJSON = withText "ThreadPoolType" parse
@@ -2328,7 +2323,7 @@ instance FromJSON ThreadPoolType where
       parse "fixed"   = return ThreadPoolFixed
       parse "cached"  = return ThreadPoolCached
       parse "fixed_auto_queue_size" = return ThreadPoolFixedAutoQueueSize
-      parse e         = fail ("Unexpected thread pool type" <> T.unpack e)
+      parse e         = error ("Unexpected thread pool type" <> T.unpack e)
 
 instance FromJSON NodeTransportInfo where
   parseJSON = withObject "NodeTransportInfo" parse
@@ -2339,7 +2334,7 @@ instance FromJSON NodeTransportInfo where
       parseProfiles (Object o)  | HM.null o = return []
       parseProfiles v@(Array _) = parseJSON v
       parseProfiles Null        = return []
-      parseProfiles _           = fail "Could not parse profiles"
+      parseProfiles _           = error "Could not parse profiles"
 
 instance FromJSON NodeNetworkInfo where
   parseJSON = withObject "NodeNetworkInfo" parse
@@ -2380,5 +2375,5 @@ instance FromJSON VersionNumber where
     where
       parse t =
         case SemVer.fromText t of
-          (Left err) -> fail err
+          (Left err) -> error err
           (Right v) -> return (VersionNumber v)
