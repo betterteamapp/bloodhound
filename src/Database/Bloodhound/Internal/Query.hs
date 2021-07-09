@@ -8,7 +8,6 @@ module Database.Bloodhound.Internal.Query
   ) where
 
 import           Bloodhound.Import
-
 import           Data.Char           (isNumber)
 import qualified Data.HashMap.Strict as HM
 import           Data.List           (nub)
@@ -182,8 +181,8 @@ instance FromJSON Query where
                            [(fn, vs)] -> do vals <- parseJSON vs
                                             case vals of
                                               x:xs -> return (TermsQuery fn (x :| xs))
-                                              _ -> fail "Expected non empty list of values"
-                           _ -> fail "Expected object with 1 field-named key"
+                                              _ -> error "Expected non empty list of values"
+                           _ -> error "Expected object with 1 field-named key"
           idsQuery o = IdsQuery <$> o .: "values"
           queryQueryStringQuery = pure . QueryQueryStringQuery
           queryMatchQuery = pure . QueryMatchQuery
@@ -194,7 +193,7 @@ instance FromJSON Query where
           constantScoreQuery o = case HM.lookup "filter" o of
             Just x -> ConstantScoreQuery <$> parseJSON x
                                          <*> o .: "boost"
-            _ -> fail "Does not appear to be a ConstantScoreQuery"
+            _ -> error "Does not appear to be a ConstantScoreQuery"
           queryFunctionScoreQuery = pure . QueryFunctionScoreQuery
           queryDisMaxQuery = pure . QueryDisMaxQuery
           queryFuzzyLikeThisQuery = pure . QueryFuzzyLikeThisQuery
@@ -367,7 +366,7 @@ instance FromJSON SimpleQueryFlag where
           parse "FUZZY"      = pure SimpleQueryFuzzy
           parse "NEAR"       = pure SimpleQueryNear
           parse "SLOP"       = pure SimpleQuerySlop
-          parse f            = fail ("Unexpected SimpleQueryFlag: " <> show f)
+          parse f            = error ("Unexpected SimpleQueryFlag: " <> show f)
 
 -- use_dis_max and tie_breaker when fields are plural?
 data QueryStringQuery =
@@ -710,7 +709,7 @@ instance FromJSON ScoreType where
           parse "avg"  = pure ScoreTypeAvg
           parse "sum"  = pure ScoreTypeSum
           parse "none" = pure ScoreTypeNone
-          parse t      = fail ("Unexpected ScoreType: " <> show t)
+          parse t      = error ("Unexpected ScoreType: " <> show t)
 
 data FuzzyQuery =
   FuzzyQuery { fuzzyQueryField         :: FieldName
@@ -912,7 +911,7 @@ instance FromJSON MatchQueryType where
   parseJSON = withText "MatchQueryType" parse
     where parse "phrase"        = pure MatchPhrase
           parse "phrase_prefix" = pure MatchPhrasePrefix
-          parse t               = fail ("Unexpected MatchQueryType: " <> show t)
+          parse t               = error ("Unexpected MatchQueryType: " <> show t)
 
 data MultiMatchQuery = MultiMatchQuery
   { multiMatchQueryFields          :: [FieldName]
@@ -988,7 +987,7 @@ instance FromJSON MultiMatchQueryType where
           parse "cross_fields"  = pure MultiMatchCrossFields
           parse "phrase"        = pure MultiMatchPhrase
           parse "phrase_prefix" = pure MultiMatchPhrasePrefix
-          parse t = fail ("Unexpected MultiMatchPhrasePrefix: " <> show t)
+          parse t = error ("Unexpected MultiMatchPhrasePrefix: " <> show t)
 
 data BoolQuery =
   BoolQuery { boolQueryMustMatch          :: [Query]
@@ -1122,7 +1121,7 @@ instance FromJSON ZeroTermsQuery where
   parseJSON = withText "ZeroTermsQuery" parse
     where parse "none" = pure ZeroTermsNone
           parse "all"  = pure ZeroTermsAll
-          parse q      = fail ("Unexpected ZeroTermsQuery: " <> show q)
+          parse q      = error ("Unexpected ZeroTermsQuery: " <> show q)
 
 data RangeExecution = RangeExecutionIndex
                     | RangeExecutionFielddata deriving (Eq, Show)
@@ -1178,7 +1177,7 @@ instance FromJSON RegexpFlag where
           parse "EMPTY"        = pure Empty
           parse "INTERSECTION" = pure Intersection
           parse "INTERVAL"     = pure Interval
-          parse f              = fail ("Unknown RegexpFlag: " <> show f)
+          parse f              = error ("Unknown RegexpFlag: " <> show f)
 
 newtype LessThan = LessThan Double deriving (Eq, Show)
 newtype LessThanEq = LessThanEq Double deriving (Eq, Show)
@@ -1311,7 +1310,7 @@ instance FromJSON Term where
     where parse o = do termObj <- o .: "term"
                        case HM.toList termObj of
                          [(fn, v)] -> Term fn <$> parseJSON v
-                         _ -> fail "Expected object with 1 field-named key"
+                         _ -> error "Expected object with 1 field-named key"
 
 data BoolMatch = MustMatch    Term  Cache
                | MustNotMatch Term  Cache
@@ -1348,7 +1347,7 @@ instance FromJSON GeoFilterType where
   parseJSON = withText "GeoFilterType" parse
     where parse "memory"  = pure GeoFilterMemory
           parse "indexed" = pure GeoFilterIndexed
-          parse t         = fail ("Unrecognized GeoFilterType: " <> show t)
+          parse t         = error ("Unrecognized GeoFilterType: " <> show t)
 
 data LatLon = LatLon { lat :: Double
                      , lon :: Double } deriving (Eq, Show)
@@ -1399,7 +1398,7 @@ instance FromJSON GeoBoundingBoxConstraint where
                                    <$> parseJSON v
                                    <*> o .:? "_cache" .!= defaultCache
                                    <*> o .: "type"
-                      _ -> fail "Could not find field name for GeoBoundingBoxConstraint"
+                      _ -> error "Could not find field name for GeoBoundingBoxConstraint"
 
 data GeoPoint =
   GeoPoint { geoField :: FieldName
@@ -1441,7 +1440,7 @@ instance FromJSON DistanceUnit where
           parse "cm"  = pure Centimeters
           parse "mm"  = pure Millimeters
           parse "nmi" = pure NauticalMiles
-          parse u     = fail ("Unrecognized DistanceUnit: " <> show u)
+          parse u     = error ("Unrecognized DistanceUnit: " <> show u)
 
 data DistanceType = Arc
                   | SloppyArc -- doesn't exist <1.0
@@ -1457,7 +1456,7 @@ instance FromJSON DistanceType where
     where parse "arc"        = pure Arc
           parse "sloppy_arc" = pure SloppyArc
           parse "plane"      = pure Plane
-          parse t            = fail ("Unrecognized DistanceType: " <> show t)
+          parse t            = error ("Unrecognized DistanceType: " <> show t)
 
 data OptimizeBbox = OptimizeGeoFilterType GeoFilterType
                   | NoOptimizeBbox deriving (Eq, Show)
@@ -1496,7 +1495,7 @@ instance FromJSON Distance where
                   validForNumber '.' = True
                   validForNumber 'e' = True
                   validForNumber c   = isNumber c
-                  parseCoeff "" = fail "Empty string cannot be parsed as number"
+                  parseCoeff "" = error "Empty string cannot be parsed as number"
                   parseCoeff s = return (read (T.unpack s))
 
 data DistanceRange =
@@ -1520,7 +1519,7 @@ instance FromJSON TemplateQueryKeyValuePairs where
     where getValue (String x) = Just x
           getValue _          = Nothing
   parseJSON _          =
-    fail "error parsing TemplateQueryKeyValuePairs"
+    error "error parsing TemplateQueryKeyValuePairs"
 
 {-| 'BooleanOperator' is the usual And/Or operators with an ES compatible
     JSON encoding baked in. Used all over the place.
@@ -1535,7 +1534,7 @@ instance FromJSON BooleanOperator where
   parseJSON = withText "BooleanOperator" parse
     where parse "and" = pure And
           parse "or"  = pure Or
-          parse o     = fail ("Unexpected BooleanOperator: " <> show o)
+          parse o     = error ("Unexpected BooleanOperator: " <> show o)
 
 {-| 'Cache' is for telling ES whether it should cache a 'Filter' not.
     'Query's cannot be cached.
@@ -1614,7 +1613,7 @@ functionScoreFunctionsPair (FunctionScoreMultiple componentFns) =
 fieldTagged :: Monad m => (FieldName -> Object -> m a) -> Object -> m a
 fieldTagged f o = case HM.toList o of
                     [(k, Object o')] -> f (FieldName k) o'
-                    _ -> fail "Expected object with 1 field-named key"
+                    _ -> error "Expected object with 1 field-named key"
 
 -- | Fuzziness value as a number or 'AUTO'.
 -- See:
